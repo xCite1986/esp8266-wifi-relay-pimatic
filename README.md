@@ -1,11 +1,5 @@
 # ESP8266-Wifi-Relay
 
-## Inhaltsverzeichnis
-* [Quick Setup] (#quick-setup)
-* [SHC Installations anleitung] (#shc-schaltserver)
-* [pimatic Installations anleitung] (#pimatic)
-* [Openhab Anleitung] (#openhab)
-* [Manuele Steuerung über tcp befehle (tcp.php] ( #php-script-tcpphp)
 ## Spezifikation
 
 - WLAN steuerbares 2-Port Relais / oder nur mit 1 Relais bestückt
@@ -40,27 +34,12 @@ Dazu bitte die [aktor.lua](/lua-tcp/aktor.lua) öffen, die WLAN Daten anpassen u
 
 ![ESPlorer](/pics/esplorer.png?raw=true)
 
-## SHC Schaltserver
-
-Um aus der "Ferne" die Relais zu steuern, hat man die Möglichkeit in [SHC](http://rpi-controlcenter.de/) einen Schalterserver einzutragen mit der IP des ESP8266-Wifi-Relay und Port 9274 ( GPIO lesen JA, GPIO schreiben JA - geeignetes Model z.B. Arduino Nano ) 
-
-Nun kann man unter *Schaltfunktionen* Ausgänge anlegen ( als Schalterserver den neu erstellen auswählen und als **GPIO4/5** )  
-
-
-Damit in SHC auch die Rückmeldung funktioniert, wenn manuel schaltet geschaltet wird, muss in der [aktor.lua](/lua-tcp/aktor.lua) noch folgendes angepasst werden:
-- In Zeile 8 bitte platform="SHC"
-- In Zeile 28 und 30 bitte die IP eintragen unter der **SHC** erreichbar ist
-- In Zeile 4,5 bitte **SID** anpassen  ( die SID findet ihr. wenn ihr euch mit Putty einloggt, in das Verzeichnis `/var/www/shc` geht und dort ein `php index.php app=shc -sw –l` eingebt. Nun wird euch eine Liste mit allen schaltbaren Elementen angezeigt, die SID jetzt bitte im [init.lua](/lua-tcp/init.lua) anpassen
-
-## MQTT
-
-Das ESP8266-Wifi-Relay lässt sich auch via [MQTT](https://primalcortex.wordpress.com/2015/02/06/nodemcu-and-mqtt-how-to-start/) steuern/abfragen. Hierfür bitte [init.lua](/lua-mqtt/init.lua) und [aktor.lua](/lua-mqtt/aktor.lua) verwenden (Achtung: die Dateien müssen angepasst werden).
 
 ## Pimatic
 
 Um das ESP8266-Wifi-Relay via Pimatic anzusteuern, ist folgende anpassung erforderlich:
 
-- Ändert in der [aktor.lua](/lua-tcp/aktor.lua) Zeile 1 - 45 wiefolgt ab:
+- Ändert in der [aktor.lua](/lua-tcp/aktor.lua) Zeile 1 - 7 wiefolgt ab:
 
 ```
 -- pimatic-edition 02.02.2016
@@ -71,43 +50,6 @@ sid2 = "Schlafzimmer_Lampe1"
 PimaticServer = "192.168.8.200"
 BaseLoginPimatic = "YWRtaW46YzRqc2luOGQ="
 
------------------------------------------------
-function send_to_visu(sid, cmd)
-  platform = "Pimatic"
-
-  if (platform == "Pimatic") then
-    if (cmd == 1) then switch="true" elseif (cmd == 0) then switch="false" end
-      port = 80
-      link = "/api/device/"..sid.."/changeStateTo?state="..switch..""
-    end
-
-  if (platform == "Openhab") then
-    if (cmd == 1) then switch="ON" elseif (cmd == 0) then switch="OFF" end
-      port = 8080
-      link = "/CMD?" ..sid.."=" ..switch
-  end
-
-print(link)
-  
-    conn=net.createConnection(net.TCP, 0) 
-    conn:on("receive", function(conn, payload) print(payload) end )
-    conn:send("GET "..link.." HTTP/1.1\r\n")
-    conn:send("Authorization: Basic "..BaseLoginPimatic.."\r\n")
-    conn:send("Host: "..PimaticServer.."\r\n")
-    conn:send("Content-Type:application/json\r\n")
-    conn:send("Connection: close\r\n")
-    conn:send("Accept: */*\r\n\r\n")  
-    conn:on("receive", function(conn, payload)
-    print('Retrieved in '..((tmr.now()-t)/1000)..' milliseconds.\n')
-    --print(payload)
-    conn:close()
-    end) 
-    t = tmr.now()
-    
-    conn:connect(port,PimaticServer)
-
-end
------------------------------------------------
 ```
 
 - Konfiguriert nun folgede Zeilen und Speichert die aktor.lua auf dem ESP8266:
@@ -154,12 +96,10 @@ Bei Umlegen des schalters in Pimatic erscheinen fogende Debugzeilen (im ESPlorer
 
 ## Manuelle Steuerung
 
-Wollt ihr an der Platine einen Taster/Schalter anschliesen, bitte dafür **GND / GPIO12** und  **GND / GPIO13** nutzen ( schaltet nach **GND** ) 
+Wollt ihr an der Platine einen Taster/Schalter anschliesen, bitte dafür **GND / GPIO12** für Relais 1/sid1 und  **GND / GPIO13** Relais 1/sid2 nutzen ( schaltet nach **GND** ) 
 
 ## Alternative Steuerungen
 
-Wer die Platine nicht mit SHC betreiben möchte, kann diese natürlich auch über einfache TCP Befehle steuern.
-Wer die Relais gegeneinandere verriegeln möchte bitte in der [aktor.lua](/lua-tcp/aktor.lua) zeile 3 `verriegelung = 1 ` damit kann immer nur 1 relais geöffnet sein
 
 ### PHP Script ([tcp.php](/tcp.php))
 
@@ -178,30 +118,7 @@ Wer die Relais gegeneinandere verriegeln möchte bitte in der [aktor.lua](/lua-t
 
 *192.168.0.62 ist im obigen Beispiel die IP Adresse des ESP8266*
 
-### HTTP Rückmeldung
 
-Möchte man Rückmeldungen vom manuellen Schalten auswerten geht dieses via HTTP ( der ESP8266 sendet einen HTTP-GET-REQUEST an eine gewünschte Seite - dazu bitte die Zeilen ([aktor.lua](/lua-tcp/aktor.lua)) 4,5,8,11,12,17,18 anpassen.
-
-### OpenHab
-
-Beispiel für [OpenHab](http://www.openhab.org/) ( Benötigt PHP auf dem OpenHab Host und das [EXEC Binding](https://github.com/openhab/openhab/wiki/Exec-Binding) )
-
-Bitte in der Items Datei (`<openhab_installation_dir>/configurations/items`) folgendes eintragen:
-
-```
-Switch Schalter "Lampe1" {exec=">[ON:php /var/www/tcp.php 192.168.0.62 2x3x1] >[OFF:php /var/www/tcp.php 192.168.0.62 2x3x0]"}
-```
-
-*192.168.0.62 ist im obigen Beispiel die IP Adresse des ESP8266*
-
-Für Rückmeldungen in Openhab bitte in der [aktor.lua](/lua-tcp/aktor.lua) folgende zeilen anpassen:
-- in Zeile 8 platform="Openhab"
-- in zeile 28,30 die ip unter der openhab erreichbar ist
-- in zeile 17 ggf den Port anpassen
-- in zeile 4,5 die namen der Items die aktualisiert werden sollen
-
-
-Weitere Informationen über OpenHab findet sich in den [Ersten Schritten](https://openhabdoc.readthedocs.org/de/latest/Beispiel/).
 
 ## Sonstige Informationen
 
@@ -257,18 +174,3 @@ Obwohl die Relais mit 10A belastet werden könnten, sind die Leiterbahnen zu den
 
 ![10A Erweiterung](/pics/esp8266-10a.png?raw=true)
 
-## Erweiterungen/Ideen (ungetestet)
-
-### Hardware
-
-- Sicherung (z.B. Reichelt *MINI FLINK 1,0A*) vor dem *HLK-PM01* - [Teardown](http://lygte-info.dk/review/Power%20Mains%20to%205V%200.6A%20Hi-Link%20HLK-PM01%20UK.html)
-- dahinter MOV (z.B. Reichelt *VDR-0,6 270*)
-- Reedkontakt (z.B. Reichelt *KSK 1A66*) als "unsichtbarer" Resetschalter
-- DS18B20 Temperatur Sensor
-- DHT22 (an **GPIO5** - Pin 1 angeschlossen)
-![Config-Page](/pics/dht22.jpg?raw=true)
-
-### Software
-
-- regelmäßiger Restart vom ESP8266
-  * Remote Neustart via Skript: `php tcp.php 192.168.0.62 0x0` (siehe oben)
