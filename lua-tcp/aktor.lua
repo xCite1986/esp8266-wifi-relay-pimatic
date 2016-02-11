@@ -1,45 +1,48 @@
 -- openhab support added 22.12.2015
 version = "0.3.2"
 verriegelung = 0 -- 0 = inaktiv 1=aktiv
-sid1 = "Keller_Lampe" -- fuer openhab itemname fuer shc sid des items
-sid2 = "Schlafzimmer_Lampe1" -- fuer openhab itemname fuer shc sid des items
------------------------------------------------
-function send_to_visu(sid, cmd)
-  host = "192.168.0.54"
-  platform = "Openhab"
+sid1 = "Beleuchtung_Arbeitszimmer" -- fuer pimatic id des switches#1
+sid2 = "Switch2" -- fuer pimatic id des switches#2
+PimaticServer = "192.168.0.200"
+BaseLoginPimatic ="YWRtaW46YzRqc2luOGQ="
 
-  if (platform == "SHC") then
-    port = 80
-    link = "/shc/index.php?app=shc&a&ajax=executeswitchcommand&sid="..sid.."&command="..cmd
-  end
-  
-  if (platform == "Openhab") then
-    if (cmd == 1) then switch="ON" elseif (cmd == 0) then switch="OFF" end
-    port = 8080
-    link = "/CMD?" ..sid.."=" ..switch
-  end
+---------------------------------------------
+function send_to_visu(sid, cmd)
+platform = "Pimatic"
+
+if (platform == "Pimatic") then
+if (cmd == 1) then switch="false" elseif (cmd == 0) then switch="true" end
+port = 80
+link = "/api/device/"..sid.."/changeStateTo?state="..switch..""
+end
+
+if (platform == "Openhab") then
+if (cmd == 1) then switch="ON" elseif (cmd == 0) then switch="OFF" end
+port = 8080
+link = "/CMD?" ..sid.."=" ..switch
+end
+
   
   print(link)
   
-    conn=net.createConnection(net.TCP, 0) 
-    conn:on("connection",function(conn, payload)
-    conn:send("GET "..link.. " ".. 
-    "Host: "..host.. "\r\n"..
-    "Accept: /\r\n"..
-    "User-Agent: Mozilla/4.0 (compatible; esp8266 Lua;)"..
-    "\r\n\r\n") 
-    end)
+conn=net.createConnection(net.TCP, 0) 
+conn:on("receive", function(conn, payload) print(payload) end )
+conn:send("GET "..link.." HTTP/1.1\r\n")
+conn:send("Authorization: Basic "..BaseLoginPimatic.."\r\n")
+conn:send("Host: "..PimaticServer.."\r\n")
+conn:send("Content-Type:application/json\r\n")
+conn:send("Connection: close\r\n")
+conn:send("Accept: */*\r\n\r\n")  
+conn:on("receive", function(conn, payload)
+print('\nRetrieved in '..((tmr.now()-t)/1000)..' milliseconds.')
+--print(payload)
+conn:close()
+end) 
+t = tmr.now()
 
-    conn:on("receive", function(conn, payload)
-    print('\nRetrieved in '..((tmr.now()-t)/1000)..' milliseconds.')
-    --print(payload)
-    conn:close()
-    end) 
-    t = tmr.now()
-
-    conn:connect(80,host)
-
+conn:connect(port,PimaticServer)
 end
+
 -----------------------------------------------
 function read_temp(pin)
   --pin = 4
@@ -115,7 +118,7 @@ tmr.alarm(0, 150, 1, function()
         -- Type 2 = Ausgang
         if (typ == "2") then
           gpio.mode(pin, gpio.OUTPUT)
-          if (befehl == "1") then
+          if (befehl == "0") then
             print("low")
             --gpio.write(pin, gpio.LOW)
             if (pin == "4") then
@@ -126,7 +129,7 @@ tmr.alarm(0, 150, 1, function()
             end
           end
 
-          if (befehl == "0") then
+          if (befehl == "1") then
             print("high")
             --gpio.write(pin, gpio.HIGH)
             if(pin == "4") then
@@ -138,6 +141,7 @@ tmr.alarm(0, 150, 1, function()
 
           end
           -- type 3 = eingang
+
         elseif (typ == "3") then
           c:send(gpio.read(pin))
           print("abfrage:"..gpio.read(pin).."\n next...")
@@ -174,15 +178,15 @@ tmr.alarm(0, 150, 1, function()
   -- fuer schalter1
   if (schalter1 == 0 and p1 ~= schalter1) then
     p1 = 0
-    --print("debug if 1")
+    print("debug if 1")
     if (lampe1 == 0) then
       lampe1 = 1
-      --print("licht zu lampe1 = 1")
+      print("licht zu lampe1 = 1")
       send_to_visu(sid1, status1)
 
     elseif (lampe1 == 1) then
       lampe1 = 0
-      --print("licht zu lampe1 = 0")
+      print("licht zu lampe1 = 0")
       send_to_visu(sid1, status1)
     end
   elseif (schalter1 == 1 and p1 ~= schalter1) then
@@ -229,26 +233,26 @@ tmr.alarm(0, 150, 1, function()
   -- end fuer schalter 2
 
   -- fuer relays schalten
-  if (lampe1 == 1) then
+  if (lampe1 == 0) then
     if(verriegelung == 1) then
         lampe2 = 0
     end 
     gpio.write(relay1, gpio.LOW)
     --print("s1 low")
   end
-  if (lampe1 == 0) then
+  if (lampe1 == 1) then
     gpio.write(relay1, gpio.HIGH)
     --print("s1 high")
   end
 
-  if (lampe2 == 1) then
+  if (lampe2 == 0) then
     if(verriegelung == 1) then
         lampe1 = 0
     end 
     gpio.write(relay2, gpio.LOW)
     --print("s2 low")
   end
-  if (lampe2 == 0) then
+  if (lampe2 == 1) then
     gpio.write(relay2, gpio.HIGH)
     --print("s2 high")
   end
