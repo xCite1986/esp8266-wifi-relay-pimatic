@@ -1,6 +1,7 @@
 count = 0
 tx_pin = 4
 
+--wifi.sta.setip({ip="192.168.0.241",netmask="255.255.255.0",gateway="192.168.0.1"}) // StaticIP, bei Bedarf erste nach WLAN-Settings nachträglich updaten 
 wifi.setmode(wifi.STATION)
 wifi.sta.connect()
 
