@@ -143,8 +143,15 @@ tmr.alarm(0, 150, 1, function()
           -- type 3 = eingang
 
         elseif (typ == "3") then
-          c:send(gpio.read(pin))
-          print("abfrage:"..gpio.read(pin).."\n next...")
+                
+                if(gpio.read(pin) == 0) then
+                c:send("1")
+                end
+                if(gpio.read(pin) == 1) then
+                c:send("0")
+                end
+          --c:send(gpio.read(pin))
+          --print("abfrage:"..gpio.read(pin).."\n next...")
         elseif (typ == "4") then
           read_temp(pin)
           t = temp
